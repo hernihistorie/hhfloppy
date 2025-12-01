@@ -34,5 +34,6 @@ def get_git_version() -> str:
 
 def floppy_disk_capture_filename_to_id(filename: str) -> uuid.UUID:
     """Convert a floppy disk capture filename to a UUID based on its name."""
+    assert not filename.endswith('_parsed')
     # Use UUID5 with the DNS namespace and the filename as the name
     return uuid.uuid5(namespace=FLOPPY_DISK_CAPTURE_FILENAME_UUID_NAMESPACE, name=filename)

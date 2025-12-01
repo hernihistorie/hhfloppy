@@ -208,7 +208,7 @@ def process_converted_disks(pyhxcfe_run_id: PyHXCFERunId, disk_captures_dir: Pat
         for floppy_subdir in sorted(floppy_dir.iterdir()):
             if not floppy_subdir.name.endswith("_parsed"):
                 continue
-            floppy_disk_capture_id = floppy_disk_capture_filename_to_id(floppy_subdir.name)
+            floppy_disk_capture_id = floppy_disk_capture_filename_to_id(floppy_subdir.name.removesuffix("_parsed"))
 
             name_info: FloppyInfoFromName = parse_name(floppy_subdir.name)
             
