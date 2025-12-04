@@ -13,7 +13,7 @@ import getpass
 import click
 import websockets
 
-NUM_TRACKS = 82
+# NUM_TRACKS = 82
 #DUMP_TIME = 440
 #DUMP_TIME = 100
 DUMP_TIME = 840
@@ -175,7 +175,10 @@ class Pauline():
         finally:
             self.pending_tasks.remove(asyncio.current_task())
 
-    async def run_batch(self, floppy_names: list[str], operator: str | None = None):
+    async def run_batch(self, floppy_names: list[str], operator: str | None = None, num_tracks: int = 82, num_sides: int = 2) -> None:
+        self.num_tracks = num_tracks
+        self.num_sides = num_sides
+        
         await self.connect()
 
         bar_outer = tqdm.tqdm(total=len(floppy_names), desc='floppy')
@@ -212,8 +215,8 @@ class Pauline():
             await self.send_ws(f"dump_time {dump_time}")
             try:
                 # static int readdisk(int drive, int dump_start_track,int dump_max_track,int dump_start_side,int dump_max_side,int high_res_mode,int doublestep,int ignore_index,int spy, char * name, char * comment, char * comment2, int start_index, int incmode, char * driveref, char * operator)
-                await self.send_ws(f'dump {floppy_index} 0 {NUM_TRACKS} 0 1 0 0 0 0 "{filename}" "" 1 AUTO_INDEX_NAME "" "" ""')
-                bar = tqdm.tqdm(total=NUM_TRACKS, desc='track', leave=False)
+                await self.send_ws(f'dump {floppy_index} 0 {self.num_tracks-1} 0 {self.num_sides-1} 0 0 0 0 "{filename}" "" 1 AUTO_INDEX_NAME "" "" ""')
+                bar = tqdm.tqdm(total=self.num_tracks, desc='track', leave=False)
                 bar.update(0)
                 while True:
                     message = await self.ws.recv()
@@ -223,7 +226,7 @@ class Pauline():
                     if match:
                         track = int(match.group(1))
                         side = int(match.group(2))
-                        bar.update(0.5)
+                        bar.update(0.5 if self.num_sides == 2 else 1.0)
                         # Save the track image after each track is completed
                         # Create background task for image saving
                         # task = asyncio.create_task(
@@ -267,7 +270,9 @@ class Pauline():
 @click.argument('address')
 @click.argument('floppy_names', nargs=-1, required=True)
 @click.option('--operator', default=None, help='Operator name (defaults to current system user)')
-def main(address: str, floppy_names: tuple[str, ...], operator: str | None):
+@click.option('--num-tracks', default=82, help='Number of tracks to dump (default: 82)')
+@click.option('--num-sides', default=2, help='Number of sides to dump (default: 2)')
+def main(address: str, floppy_names: tuple[str, ...], operator: str | None, num_tracks: int, num_sides: int):
     """
     Dump floppy disks using Pauline.
     
@@ -276,7 +281,7 @@ def main(address: str, floppy_names: tuple[str, ...], operator: str | None):
     Names of the floppies to dump (one or more). Use '-' to skip a drive, '+' to increment last name, 'clean' for cleaning disk.
     """
     pauline = Pauline(address=address)
-    asyncio.run(pauline.run_batch(floppy_names=list(floppy_names), operator=operator))
+    asyncio.run(pauline.run_batch(floppy_names=list(floppy_names), operator=operator, num_tracks=num_tracks, num_sides=num_sides))
 
 if __name__ == "__main__":
     main()
