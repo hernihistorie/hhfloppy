@@ -43,7 +43,7 @@ FORMATS = [
     ('PNG_DISK_IMAGE', 'png'),
 ]
 
-def convert_disk_capture_directory(pyhxcfe_run_id: PyHXCFERunId, hxcfe_binary_path: Path, floppy_subdir: Path) -> list[Event]:
+def convert_disk_capture_directory(pyhxcfe_run_id: PyHXCFERunId, hxcfe_binary_path: Path, floppy_subdir: Path, extra_formats: list[tuple[str, str]] | None = None) -> list[Event]:
     floppy_disk_capture_id = floppy_disk_capture_filename_to_id(floppy_subdir.name)
     parsed_dir = floppy_subdir.parent / (floppy_subdir.name + "_parsed_wip")
     if not os.path.exists(parsed_dir):
@@ -55,7 +55,8 @@ def convert_disk_capture_directory(pyhxcfe_run_id: PyHXCFERunId, hxcfe_binary_pa
         '-finput:' + shlex.quote(str(first_file)),
     ]
 
-    for fmt, extension in FORMATS:
+    all_formats = list(FORMATS) + (extra_formats or [])
+    for fmt, extension in all_formats:
         cmd.append('-conv:' + fmt)
         cmd.append('-foutput:' + shlex.quote(str(parsed_dir / (f'{fmt}.{extension}'))))
 
@@ -77,7 +78,7 @@ def convert_disk_capture_directory(pyhxcfe_run_id: PyHXCFERunId, hxcfe_binary_pa
             floppy_disk_capture_id_source='hashed_directory_name',
             floppy_disk_capture_directory=floppy_subdir.name,
             success=True,
-            formats=[fmt for fmt, _ in FORMATS]
+            formats=[fmt for fmt, _ in all_formats]
         )
     ]
 
@@ -267,6 +268,12 @@ def process_converted_disks(pyhxcfe_run_id: PyHXCFERunId, disk_captures_dir: Pat
     help='Path to hxcfe binary'
 )
 @click.option(
+    '--extra-formats',
+    multiple=True,
+    type=str,
+    help='Additional formats to process.  Provide as FORMAT.EXTENSION pairs (e.g. HXC_HFE.hfe).'
+)
+@click.option(
     '--workers',
     default=WORKERS,
     type=int,
@@ -288,12 +295,20 @@ def process_converted_disks(pyhxcfe_run_id: PyHXCFERunId, disk_captures_dir: Pat
     default=None,
     help='Output path for HTML summary (default: summary_TIMESTAMP.html in disk captures dir)'
 )
-def main(disk_captures_dir: Path, hxcfe_binary_path: Path, workers: int, redo: bool, 
+def main(disk_captures_dir: Path, hxcfe_binary_path: Path, extra_formats: tuple[str, ...], workers: int, redo: bool, 
          summary_only: bool, output: Path | None):
     """Process disk captures with HxCFloppyEmulator.
     
     DISK_CAPTURES_DIR: Directory containing floppy disk captures to process
     """
+    # Parse extra formats from FORMAT.EXTENSION strings into tuples
+    parsed_extra_formats: list[tuple[str, str]] = []
+    for fmt in extra_formats:
+        if '.' not in fmt:
+            print(f"Error: Invalid extra format '{fmt}'. Expected FORMAT.EXTENSION (e.g. HXC_HFE.hfe)")
+            sys.exit(1)
+        format_name, extension = fmt.rsplit('.', 1)
+        parsed_extra_formats.append((format_name, extension))
 
     event_store = EventStore(namespace='hhfloppy', app="pyhxcfe")
 
@@ -347,7 +362,7 @@ def main(disk_captures_dir: Path, hxcfe_binary_path: Path, workers: int, redo: b
         with tqdm(total=len(dirs)) as pbar:
             with ThreadPoolExecutor(max_workers=workers) as ex:
                 futures = [
-                    ex.submit(convert_disk_capture_directory, run_id, hxcfe_binary_path, dir) for dir in dirs
+                    ex.submit(convert_disk_capture_directory, run_id, hxcfe_binary_path, dir, parsed_extra_formats) for dir in dirs
                 ]
                 for future in as_completed(futures):
                     try:
