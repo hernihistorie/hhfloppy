@@ -9,7 +9,7 @@ from msgspec import field
 
 from .datatypes import HHFLOPPY_EVENT_DATA_CLASS_UNION, FileMetadata, FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML, HHFloppyTaggedStruct
 
-EVENT_VERSION = 7
+EVENT_VERSION = 8
 EVENT_NAMESPACE = 'hhfloppy'
 
 class Event(HHFloppyTaggedStruct, kw_only=True, frozen=True):
@@ -72,12 +72,29 @@ class PyHXCFEERunFinished(Event, frozen=True):
     """
     pyhxcfe_run_id: PyHXCFERunId
 
+FileConversionProgram = Literal['pyhxcfe', 'samdisk', 'a8rawconv']
+
+class FileConverted(Event, frozen=True):
+    """
+    Event triggered when a file has been converted.
+    """
+    input_file_metadata: FileMetadata
+    output_file_metadata: FileMetadata
+    program: FileConversionProgram
+    command: list[str]
+    exit_code: int
+    stdout: str
+    stderr: str
+    has_warnings: bool
+    has_errors: bool
+
 HHFLOPPY_EVENT_CLASS_UNION = Union[
     TestEvent,
     PyHXCFEERunStarted,
     FloppyDiskCaptureDirectoryConverted,
     FloppyDiskCaptureSummarized,
     PyHXCFEERunFinished,
+    FileConverted
 ]
 
 # For sanity, try to make a decoder

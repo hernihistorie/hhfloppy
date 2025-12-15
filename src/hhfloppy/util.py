@@ -1,6 +1,11 @@
+import hashlib
 import uuid
 import subprocess
 from pathlib import Path
+
+import blake3
+
+from event.datatypes import FileChecksums, FileMetadata
 
 FLOPPY_DISK_CAPTURE_FILENAME_UUID_NAMESPACE = uuid.UUID('019a9df8-6505-7032-923f-12a806f8bdbf')
 
@@ -37,3 +42,48 @@ def floppy_disk_capture_filename_to_id(filename: str) -> uuid.UUID:
     assert not filename.endswith('_parsed')
     # Use UUID5 with the DNS namespace and the filename as the name
     return uuid.uuid5(namespace=FLOPPY_DISK_CAPTURE_FILENAME_UUID_NAMESPACE, name=filename)
+
+
+class PathWithExtension():
+    """Path container for files with a specific extension."""
+    EXTENSION = ''
+
+    def __init__(self, path: Path):
+        if path.suffix.lower() != self.EXTENSION:
+            raise ValueError(f"Error: Expected {self.EXTENSION} file, got {path}")
+        self.path = path
+
+    def __str__(self):
+        return str(self.path)
+
+
+def get_file_metadata(file_path: Path) -> FileMetadata:
+    """Compute metadata (filename, size, checksums) for a file."""
+    md5_hash = hashlib.md5()
+    sha256_hash = hashlib.sha256()
+    blake3_hash = blake3.blake3()
+
+    with open(file_path, 'rb') as f:
+        for chunk in iter(lambda: f.read(8192), b''):
+            md5_hash.update(chunk)
+            sha256_hash.update(chunk)
+            blake3_hash.update(chunk)
+
+    return FileMetadata(
+        filename=file_path.name,
+        size=file_path.stat().st_size,
+        checksums=FileChecksums(
+            md5=md5_hash.hexdigest(),
+            sha256=sha256_hash.hexdigest(),
+            blake3=blake3_hash.hexdigest()
+        )
+    )
+
+
+def get_directory_files_metadata(directory: Path) -> list[FileMetadata]:
+    """Collect metadata for all files in a directory."""
+    files_metadata: list[FileMetadata] = []
+    for file_path in sorted(directory.iterdir()):
+        if file_path.is_file():
+            files_metadata.append(get_file_metadata(file_path))
+    return files_metadata
