@@ -7,9 +7,9 @@ import uuid
 import msgspec
 from msgspec import field
 
-from .datatypes import HHFLOPPY_EVENT_DATA_CLASS_UNION, FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML, HHFloppyTaggedStruct
+from .datatypes import HHFLOPPY_EVENT_DATA_CLASS_UNION, FileMetadata, FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML, HHFloppyTaggedStruct
 
-EVENT_VERSION = 6
+EVENT_VERSION = 7
 EVENT_NAMESPACE = 'hhfloppy'
 
 class Event(HHFloppyTaggedStruct, kw_only=True, frozen=True):
@@ -50,6 +50,7 @@ class FloppyDiskCaptureDirectoryConverted(Event, frozen=True):
     floppy_disk_capture_directory: str
     success: bool
     formats: list[str]
+    files_metadata: list[FileMetadata] | None = None
 
 class FloppyDiskCaptureSummarized(Event, frozen=True):
     """

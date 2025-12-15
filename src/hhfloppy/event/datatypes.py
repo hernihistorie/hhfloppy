@@ -41,10 +41,22 @@ class FloppyInfoFromIMD(HHFloppyTaggedStruct, kw_only=True, frozen=True):
     error_count: int | None
     parsing_errors: str | None
 
+class FileChecksums(HHFloppyTaggedStruct, kw_only=True, frozen=True):
+    md5: str
+    sha256: str
+    blake3: str
+
+class FileMetadata(HHFloppyTaggedStruct, kw_only=True, frozen=True):
+    filename: str
+    size: int
+    checksums: FileChecksums
+
 HHFLOPPY_EVENT_DATA_CLASS_UNION = Union[
     FloppyInfoFromName,
     FloppyInfoFromXML,
     FloppyInfoFromIMD,
+    FileChecksums,
+    FileMetadata,
 ]
 
 # For sanity, try to make a decoder

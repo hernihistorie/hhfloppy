@@ -31,6 +31,12 @@ wish to dump.  There are two special characters: `+` increments the previous ass
 This script uses the command line interface of HxCFloppyEmulator Software to perform a batch conversion of a directory
 of floppy dumps made with Pauline.
 
+While developing, you may want to test with a local event store:
+
+```bash
+EVENT_STORE_ADDRESS=http://127.0.0.1:5000/ uv run python ./src/hhfloppy/pyhxcfe.py ./disk_captures/test/ --redo
+```
+
 ## src/hhfloppy/conv_atari8bit.py
 
 This script batch converts a directory of floppy dumps for the Atari 8-bit micros to the ATR format.

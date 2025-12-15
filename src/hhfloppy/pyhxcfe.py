@@ -14,6 +14,8 @@ import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime
 import uuid
+import hashlib
+import blake3
 
 import click
 from jinja2 import Environment, FileSystemLoader
@@ -21,7 +23,7 @@ from tqdm import tqdm
 from python_imd.imd import Disk
 from event.events import Event, FloppyDiskCaptureDirectoryConverted, FloppyDiskCaptureSummarized, PyHXCFEERunFinished, PyHXCFEERunStarted, PyHXCFERunId
 from event.event_store import EventStore
-from event.datatypes import FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML
+from event.datatypes import FileChecksums, FileMetadata, FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML
 from util import floppy_disk_capture_filename_to_id, get_git_version
 
 HXCFE_BINARY_PATH = Path('/home/sanqui/ha/HxCFloppyEmulator/build/hxcfe')
@@ -42,6 +44,36 @@ FORMATS = [
     ('PNG_STREAM_IMAGE', 'png'),
     ('PNG_DISK_IMAGE', 'png'),
 ]
+
+def get_file_metadata(file_path: Path) -> FileMetadata:
+    """Compute metadata (filename, size, checksums) for a file."""
+    md5_hash = hashlib.md5()
+    sha256_hash = hashlib.sha256()
+    blake3_hash = blake3.blake3()
+    
+    with open(file_path, 'rb') as f:
+        for chunk in iter(lambda: f.read(8192), b''):
+            md5_hash.update(chunk)
+            sha256_hash.update(chunk)
+            blake3_hash.update(chunk)
+    
+    return FileMetadata(
+        filename=file_path.name,
+        size=file_path.stat().st_size,
+        checksums=FileChecksums(
+            md5=md5_hash.hexdigest(),
+            sha256=sha256_hash.hexdigest(),
+            blake3=blake3_hash.hexdigest()
+        )
+    )
+
+def get_directory_files_metadata(directory: Path) -> list[FileMetadata]:
+    """Collect metadata for all files in a directory."""
+    files_metadata: list[FileMetadata] = []
+    for file_path in sorted(directory.iterdir()):
+        if file_path.is_file():
+            files_metadata.append(get_file_metadata(file_path))
+    return files_metadata
 
 def convert_disk_capture_directory(pyhxcfe_run_id: PyHXCFERunId, hxcfe_binary_path: Path, floppy_subdir: Path, extra_formats: list[tuple[str, str]] | None = None) -> list[Event]:
     floppy_disk_capture_id = floppy_disk_capture_filename_to_id(floppy_subdir.name)
@@ -69,7 +101,11 @@ def convert_disk_capture_directory(pyhxcfe_run_id: PyHXCFERunId, hxcfe_binary_pa
             env=dict(os.environ, LD_LIBRARY_PATH=hxcfe_binary_path.parent.as_posix())
         )
 
-    os.rename(parsed_dir, floppy_subdir.parent / (floppy_subdir.name + "_parsed"))
+    final_parsed_dir = floppy_subdir.parent / (floppy_subdir.name + "_parsed")
+    os.rename(parsed_dir, final_parsed_dir)
+
+    # Collect metadata for all files in the converted directory
+    files_metadata = get_directory_files_metadata(final_parsed_dir)
 
     return [
         FloppyDiskCaptureDirectoryConverted(
@@ -78,7 +114,8 @@ def convert_disk_capture_directory(pyhxcfe_run_id: PyHXCFERunId, hxcfe_binary_pa
             floppy_disk_capture_id_source='hashed_directory_name',
             floppy_disk_capture_directory=floppy_subdir.name,
             success=True,
-            formats=[fmt for fmt, _ in all_formats]
+            formats=[fmt for fmt, _ in all_formats],
+            files_metadata=files_metadata
         )
     ]
 
