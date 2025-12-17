@@ -74,17 +74,24 @@ class PyHXCFEERunFinished(Event, frozen=True):
 
 FileConversionProgram = Literal['pyhxcfe', 'samdisk', 'a8rawconv']
 
+class CommandRan(Event, frozen=True):
+    """
+    Event triggered when an external command has been run.
+    """
+    program: FileConversionProgram
+    command: list[str]
+    exit_code: int
+    stdout: str
+    stderr: str
+
 class FileConverted(Event, frozen=True):
     """
     Event triggered when a file has been converted.
     """
     input_file_metadata: FileMetadata
     output_file_metadata: FileMetadata
+    command_ran_event_id: uuid.UUID
     program: FileConversionProgram
-    command: list[str]
-    exit_code: int
-    stdout: str
-    stderr: str
     has_warnings: bool
     has_errors: bool
 
