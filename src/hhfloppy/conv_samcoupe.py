@@ -5,8 +5,9 @@ import typer
 import tqdm
 
 from event.event_store import EventStore
-from event.events import FileConverted
-from util import PathWithExtension, get_file_metadata
+from event.events import CommandRan, FileConverted, Event, FloppyDiskCaptureConverted
+from event.datatypes import FloppyDiskFormat
+from util import PathWithExtension, get_file_metadata, floppy_disk_capture_filename_to_id
 
 SAMDISK_BINARY_PATH = Path('deps/SAMdisk3811/SAMdisk.exe')
 
@@ -22,7 +23,18 @@ class DSKPath(PathWithExtension):
     """Path container for files with the DSK extension."""
     EXTENSION = '.dsk'
 
-def samdisk_convert(input_filepath: HFEPath, output_filepath: MGTPath | DSKPath) -> FileConverted:
+def run_command(command: list[str]) -> CommandRan:
+    output = subprocess.run(command, check=True, text=True, capture_output=True)
+
+    event = CommandRan(
+        command=command,
+        exit_code=output.returncode,
+        stdout=output.stdout,
+        stderr=output.stderr,
+    )
+    return event
+
+def samdisk_convert(input_filepath: HFEPath, output_filepath: MGTPath | DSKPath) -> tuple[CommandRan, FileConverted]:
     command: list[str] = [
         'wine',
         str(SAMDISK_BINARY_PATH),
@@ -30,35 +42,53 @@ def samdisk_convert(input_filepath: HFEPath, output_filepath: MGTPath | DSKPath)
         str(output_filepath),
     ]
 
-    output = subprocess.run(command, check=True, text=True, capture_output=True)
+    command_ran_event = run_command(command)
 
     input_file_metadata = get_file_metadata(input_filepath.path)
     output_file_metadata = get_file_metadata(output_filepath.path)
 
     has_warnings = False
     has_errors = False
-    for line in output.stdout.splitlines() + output.stderr.splitlines():
+    for line in command_ran_event.stdout.splitlines() + command_ran_event.stderr.splitlines():
         if 'Warning:' in line:
             has_warnings = True
         if 'Error:' in line:
             has_errors = True
 
-    event = FileConverted(
+    file_converted_event = FileConverted(
+        command_ran_event_id=command_ran_event.event_id,
         input_file_metadata=input_file_metadata,
         output_file_metadata=output_file_metadata,
         program='samdisk',
-        command=command,
-        exit_code=output.returncode,
-        stdout=output.stdout,
-        stderr=output.stderr,
         has_warnings=has_warnings,
         has_errors=has_errors,
     )
-    return event
+    return (command_ran_event, file_converted_event)
 
+def floppy_disk_capture_convert(input_filepath: HFEPath, target_format: FloppyDiskFormat) -> tuple[CommandRan, FileConverted, FloppyDiskCaptureConverted]:
+    if target_format == FloppyDiskFormat.MGT:
+        output_filepath = MGTPath(input_filepath.path.parent / 'disk.mgt')
+    elif target_format == FloppyDiskFormat.DSK:
+        output_filepath = DSKPath(input_filepath.path.parent / 'disk.dsk')
+    else:
+        raise ValueError(f"Error: Unsupported target format {target_format}")
 
-def conv_dir(dirpath: Path) -> list[FileConverted]:
-    events: list[FileConverted] = []
+    command_ran_event, file_converted_event = samdisk_convert(input_filepath, output_filepath)
+
+    floppy_disk_capture_converted_event = FloppyDiskCaptureConverted(
+        floppy_disk_capture_id=floppy_disk_capture_filename_to_id(input_filepath.path.parent.name),
+        floppy_disk_capture_id_source='filename',
+        floppy_disk_capture_directory=str(input_filepath.path.parent.name),
+        source_format=FloppyDiskFormat.HFE,
+        target_format=target_format,
+        has_warnings=file_converted_event.has_warnings,
+        has_errors=file_converted_event.has_errors,
+    )
+
+    return (command_ran_event, file_converted_event, floppy_disk_capture_converted_event)
+
+def conv_dir(dirpath: Path) -> list[Event]:
+    events: list[Event] = []
 
     hfe_filepaths = sorted(dirpath.glob('**/*.hfe'))
 
@@ -66,16 +96,20 @@ def conv_dir(dirpath: Path) -> list[FileConverted]:
 
     for hfe_filepath in tqdm.tqdm(hfe_filepaths):
         hfe_path = HFEPath(hfe_filepath)
-        mgt_path = MGTPath(hfe_filepath.parent / ('disk.mgt'))
-        dsk_path = DSKPath(hfe_filepath.parent / ('disk.dsk'))
-
         tqdm.tqdm.write(f"Converting {hfe_path}...")
-        events.append(samdisk_convert(hfe_path, mgt_path))
-        events.append(samdisk_convert(hfe_path, dsk_path))
+        events += floppy_disk_capture_convert(hfe_path, FloppyDiskFormat.MGT)
+        events += floppy_disk_capture_convert(hfe_path, FloppyDiskFormat.DSK)
 
-    num_files_with_warnings = sum(1 for e in events if e.has_warnings)
-    num_files_with_errors = sum(1 for e in events if e.has_errors)
+    num_files_with_warnings = 0
+    num_files_with_errors = 0
 
+    for event in events:
+        if isinstance(event, FileConverted):
+            if event.has_warnings:
+                num_files_with_warnings += 1
+            if event.has_errors:
+                num_files_with_errors += 1
+    
     print("Conversion summary:")
     print(f"  Total files converted: {len(events)}")
     print(f"  Files with warnings: {num_files_with_warnings}")

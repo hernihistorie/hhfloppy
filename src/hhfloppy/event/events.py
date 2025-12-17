@@ -1,15 +1,16 @@
 from __future__ import annotations # Needed to fix https://github.com/jcrist/msgspec/issues/924
 
 import datetime
+from enum import Enum
 from typing import Literal, NewType, Union
 import uuid
 
 import msgspec
 from msgspec import field
 
-from .datatypes import HHFLOPPY_EVENT_DATA_CLASS_UNION, FileMetadata, FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML, HHFloppyTaggedStruct
+from .datatypes import HHFLOPPY_EVENT_DATA_CLASS_UNION, FileMetadata, FloppyDiskFormat, FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML, HHFloppyTaggedStruct
 
-EVENT_VERSION = 8
+EVENT_VERSION = 9
 EVENT_NAMESPACE = 'hhfloppy'
 
 class Event(HHFloppyTaggedStruct, kw_only=True, frozen=True):
@@ -72,13 +73,12 @@ class PyHXCFEERunFinished(Event, frozen=True):
     """
     pyhxcfe_run_id: PyHXCFERunId
 
-FileConversionProgram = Literal['pyhxcfe', 'samdisk', 'a8rawconv']
+ProgramName = Literal['pyhxcfe', 'samdisk', 'a8rawconv']
 
 class CommandRan(Event, frozen=True):
     """
     Event triggered when an external command has been run.
     """
-    program: FileConversionProgram
     command: list[str]
     exit_code: int
     stdout: str
@@ -91,7 +91,19 @@ class FileConverted(Event, frozen=True):
     input_file_metadata: FileMetadata
     output_file_metadata: FileMetadata
     command_ran_event_id: uuid.UUID
-    program: FileConversionProgram
+    program: ProgramName
+    has_warnings: bool
+    has_errors: bool
+
+class FloppyDiskCaptureConverted(Event, frozen=True):
+    """
+    Event triggered when a floppy disk capture has been converted from one format to another.
+    """
+    floppy_disk_capture_id: uuid.UUID
+    floppy_disk_capture_id_source: FloppyDiskCaptureIDSource
+    floppy_disk_capture_directory: str
+    source_format: FloppyDiskFormat
+    target_format: FloppyDiskFormat
     has_warnings: bool
     has_errors: bool
 
@@ -101,9 +113,9 @@ HHFLOPPY_EVENT_CLASS_UNION = Union[
     FloppyDiskCaptureDirectoryConverted,
     FloppyDiskCaptureSummarized,
     PyHXCFEERunFinished,
-    FileConverted
+    CommandRan,
+    FileConverted,
+    FloppyDiskCaptureConverted,
 ]
-
-# For sanity, try to make a decoder
 
 event_decoder = msgspec.json.Decoder(HHFLOPPY_EVENT_CLASS_UNION | HHFLOPPY_EVENT_DATA_CLASS_UNION)

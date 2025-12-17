@@ -1,5 +1,6 @@
 from __future__ import annotations # Needed to fix https://github.com/jcrist/msgspec/issues/924
 
+from enum import Enum
 from typing import Union
 
 import msgspec
@@ -51,12 +52,19 @@ class FileMetadata(HHFloppyTaggedStruct, kw_only=True, frozen=True):
     size: int
     checksums: FileChecksums
 
+
+class FloppyDiskFormat(Enum):
+    HFE = 'HFE'
+    MGT = 'MGT'
+    DSK = 'DSK'
+
 HHFLOPPY_EVENT_DATA_CLASS_UNION = Union[
     FloppyInfoFromName,
     FloppyInfoFromXML,
     FloppyInfoFromIMD,
     FileChecksums,
     FileMetadata,
+    FloppyDiskFormat
 ]
 
 # For sanity, try to make a decoder
