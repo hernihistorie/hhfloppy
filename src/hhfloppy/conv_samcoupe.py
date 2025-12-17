@@ -6,7 +6,7 @@ import tqdm
 
 from event.event_store import EventStore
 from event.events import CommandRan, FileConverted, Event, FloppyDiskCaptureConverted
-from event.datatypes import FloppyDiskFormat
+from event.datatypes import FloppyDiskFormat, FloppyDiskCaptureIDSource, ProgramName
 from util import PathWithExtension, get_file_metadata, floppy_disk_capture_filename_to_id
 
 SAMDISK_BINARY_PATH = Path('deps/SAMdisk3811/SAMdisk.exe')
@@ -56,10 +56,10 @@ def samdisk_convert(input_filepath: HFEPath, output_filepath: MGTPath | DSKPath)
             has_errors = True
 
     file_converted_event = FileConverted(
-        command_ran_event_id=command_ran_event.event_id,
+        command_run_id=command_ran_event.command_run_id,
         input_file_metadata=input_file_metadata,
         output_file_metadata=output_file_metadata,
-        program='samdisk',
+        program=ProgramName.samdisk,
         has_warnings=has_warnings,
         has_errors=has_errors,
     )
@@ -77,8 +77,9 @@ def floppy_disk_capture_convert(input_filepath: HFEPath, target_format: FloppyDi
 
     floppy_disk_capture_converted_event = FloppyDiskCaptureConverted(
         floppy_disk_capture_id=floppy_disk_capture_filename_to_id(input_filepath.path.parent.name),
-        floppy_disk_capture_id_source='filename',
+        floppy_disk_capture_id_source=FloppyDiskCaptureIDSource.hashed_directory_name,
         floppy_disk_capture_directory=str(input_filepath.path.parent.name),
+        file_conversion_id=file_converted_event.file_conversion_id,
         source_format=FloppyDiskFormat.HFE,
         target_format=target_format,
         has_warnings=file_converted_event.has_warnings,

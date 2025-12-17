@@ -1,10 +1,15 @@
 from __future__ import annotations # Needed to fix https://github.com/jcrist/msgspec/issues/924
 
 from enum import Enum
-from typing import Union
+from typing import NewType, Union
+import uuid
 
 import msgspec
 
+PyHXCFERunID = NewType('PyHXCFERunID', uuid.UUID)
+FloppyDiskCaptureID = NewType('FloppyDiskCaptureID', uuid.UUID)
+CommandRunID = NewType('CommandRunID', uuid.UUID)
+FileConversionID = NewType('FileConversionID', uuid.UUID)
 
 class HHFloppyTaggedStruct(msgspec.Struct, kw_only=True, frozen=True, tag_field="type", tag=True):
     pass
@@ -58,15 +63,24 @@ class FloppyDiskFormat(Enum):
     MGT = 'MGT'
     DSK = 'DSK'
 
+# Add e.g. info.json here once implemented
+class FloppyDiskCaptureIDSource(Enum):
+    hashed_directory_name = 'hashed_directory_name'
+
 HHFLOPPY_EVENT_DATA_CLASS_UNION = Union[
     FloppyInfoFromName,
     FloppyInfoFromXML,
     FloppyInfoFromIMD,
     FileChecksums,
-    FileMetadata,
-    FloppyDiskFormat
+    FileMetadata
 ]
 
 # For sanity, try to make a decoder
 
 _decoder = msgspec.json.Decoder(HHFLOPPY_EVENT_DATA_CLASS_UNION)
+
+
+class ProgramName(Enum):
+    pyhxcfe = 'pyhxcfe'
+    samdisk = 'samdisk'
+    a8rawconv = 'a8rawconv'

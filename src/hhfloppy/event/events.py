@@ -1,39 +1,34 @@
 from __future__ import annotations # Needed to fix https://github.com/jcrist/msgspec/issues/924
 
 import datetime
-from enum import Enum
-from typing import Literal, NewType, Union
+from typing import NewType, Union
 import uuid
 
 import msgspec
 from msgspec import field
 
-from .datatypes import HHFLOPPY_EVENT_DATA_CLASS_UNION, FileMetadata, FloppyDiskFormat, FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML, HHFloppyTaggedStruct
+from .datatypes import HHFLOPPY_EVENT_DATA_CLASS_UNION, CommandRunID, FileConversionID, FileMetadata, FloppyDiskFormat, FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML, HHFloppyTaggedStruct, FloppyDiskCaptureIDSource, FloppyDiskCaptureID, PyHXCFERunID, ProgramName
 
-EVENT_VERSION = 9
+EVENT_VERSION = 10
 EVENT_NAMESPACE = 'hhfloppy'
 
+EventID = NewType('EventID', uuid.UUID)
 class Event(HHFloppyTaggedStruct, kw_only=True, frozen=True):
     """Base class for events."""
 
     event_version: int = EVENT_VERSION
     event_timestamp: datetime.datetime = field(default_factory=datetime.datetime.now)
     event_namespace: str = EVENT_NAMESPACE
-    event_id: uuid.UUID = field(default_factory=uuid.uuid7)
+    event_id: EventID = field(default_factory=lambda: EventID(uuid.uuid7()))
 
 class TestEvent(Event, kw_only=True, frozen=True):
     test_data: str
-
-PyHXCFERunId = NewType('PyHXCFERunId', uuid.UUID)
-
-# Add e.g. info.json here once implemented
-FloppyDiskCaptureIDSource = Literal['hashed_directory_name']
 
 class PyHXCFEERunStarted(Event, frozen=True):
     """
     Event triggered when pyhxcfe starts processing.
     """
-    pyhxcfe_run_id: PyHXCFERunId
+    pyhxcfe_run_id: PyHXCFERunID
     command: list[str]
     user: str | None
     host: str | None
@@ -45,8 +40,8 @@ class FloppyDiskCaptureDirectoryConverted(Event, frozen=True):
     Event triggered when a floppy disk capture has been converted
     using hxcfe.
     """
-    pyhxcfe_run_id: PyHXCFERunId
-    floppy_disk_capture_id: uuid.UUID
+    pyhxcfe_run_id: PyHXCFERunID
+    floppy_disk_capture_id: FloppyDiskCaptureID
     floppy_disk_capture_id_source: FloppyDiskCaptureIDSource
     floppy_disk_capture_directory: str
     success: bool
@@ -57,8 +52,8 @@ class FloppyDiskCaptureSummarized(Event, frozen=True):
     """
     Event triggered when a floppy disk capture has been summarized.
     """
-    pyhxcfe_run_id: PyHXCFERunId
-    floppy_disk_capture_id: uuid.UUID
+    pyhxcfe_run_id: PyHXCFERunID
+    floppy_disk_capture_id: FloppyDiskCaptureID
     floppy_disk_capture_id_source: FloppyDiskCaptureIDSource
     floppy_disk_capture_directory: str
 
@@ -71,9 +66,7 @@ class PyHXCFEERunFinished(Event, frozen=True):
     """
     Event triggered when pyhxcfe finishes processing.
     """
-    pyhxcfe_run_id: PyHXCFERunId
-
-ProgramName = Literal['pyhxcfe', 'samdisk', 'a8rawconv']
+    pyhxcfe_run_id: PyHXCFERunID
 
 class CommandRan(Event, frozen=True):
     """
@@ -83,6 +76,7 @@ class CommandRan(Event, frozen=True):
     exit_code: int
     stdout: str
     stderr: str
+    command_run_id: CommandRunID = field(default_factory=lambda: CommandRunID(uuid.uuid7()))
 
 class FileConverted(Event, frozen=True):
     """
@@ -90,18 +84,20 @@ class FileConverted(Event, frozen=True):
     """
     input_file_metadata: FileMetadata
     output_file_metadata: FileMetadata
-    command_ran_event_id: uuid.UUID
+    command_run_id: CommandRunID
     program: ProgramName
     has_warnings: bool
     has_errors: bool
+    file_conversion_id: FileConversionID = field(default_factory=lambda: FileConversionID(uuid.uuid7()))
 
 class FloppyDiskCaptureConverted(Event, frozen=True):
     """
     Event triggered when a floppy disk capture has been converted from one format to another.
     """
-    floppy_disk_capture_id: uuid.UUID
+    floppy_disk_capture_id: FloppyDiskCaptureID
     floppy_disk_capture_id_source: FloppyDiskCaptureIDSource
     floppy_disk_capture_directory: str
+    file_conversion_id: FileConversionID
     source_format: FloppyDiskFormat
     target_format: FloppyDiskFormat
     has_warnings: bool

@@ -8,7 +8,7 @@ from typing import Sequence
 import requests
 import msgspec
 
-from .events import Event
+from event.events import Event
 
 PUSH_KEY_LENGTH = 24
 DEFAULT_EVENT_STORE_ADDRESS = "https://inventory.herniarchiv.cz/"

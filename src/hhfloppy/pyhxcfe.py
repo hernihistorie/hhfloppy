@@ -18,9 +18,10 @@ import uuid
 import click
 from jinja2 import Environment, FileSystemLoader
 from tqdm import tqdm
+from hhfloppy.event.datatypes import FloppyDiskCaptureIDSource, PyHXCFERunID
 from util import get_directory_files_metadata, floppy_disk_capture_filename_to_id, get_git_version
 from python_imd.imd import Disk
-from event.events import Event, FloppyDiskCaptureDirectoryConverted, FloppyDiskCaptureSummarized, PyHXCFEERunFinished, PyHXCFEERunStarted, PyHXCFERunId
+from event.events import Event, FloppyDiskCaptureDirectoryConverted, FloppyDiskCaptureSummarized, PyHXCFEERunFinished, PyHXCFEERunStarted
 from event.event_store import EventStore
 from event.datatypes import FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML
 
@@ -43,7 +44,7 @@ FORMATS = [
     ('PNG_DISK_IMAGE', 'png'),
 ]
 
-def convert_disk_capture_directory(pyhxcfe_run_id: PyHXCFERunId, hxcfe_binary_path: Path, floppy_subdir: Path, extra_formats: list[tuple[str, str]] | None = None) -> list[Event]:
+def convert_disk_capture_directory(pyhxcfe_run_id: PyHXCFERunID, hxcfe_binary_path: Path, floppy_subdir: Path, extra_formats: list[tuple[str, str]] | None = None) -> list[Event]:
     floppy_disk_capture_id = floppy_disk_capture_filename_to_id(floppy_subdir.name)
     parsed_dir = floppy_subdir.parent / (floppy_subdir.name + "_parsed_wip")
     if not os.path.exists(parsed_dir):
@@ -79,7 +80,7 @@ def convert_disk_capture_directory(pyhxcfe_run_id: PyHXCFERunId, hxcfe_binary_pa
         FloppyDiskCaptureDirectoryConverted(
             pyhxcfe_run_id=pyhxcfe_run_id,
             floppy_disk_capture_id=floppy_disk_capture_id,
-            floppy_disk_capture_id_source='hashed_directory_name',
+            floppy_disk_capture_id_source=FloppyDiskCaptureIDSource.hashed_directory_name,
             floppy_disk_capture_directory=floppy_subdir.name,
             success=True,
             formats=[fmt for fmt, _ in all_formats],
@@ -317,7 +318,7 @@ def main(disk_captures_dir: Path, hxcfe_binary_path: Path, extra_formats: tuple[
 
     event_store = EventStore(namespace='hhfloppy', app="pyhxcfe")
 
-    run_id = PyHXCFERunId(uuid.uuid7())
+    run_id = uuid.uuid7()
 
     event_store.emit_event(PyHXCFEERunStarted(
         pyhxcfe_run_id=run_id,
