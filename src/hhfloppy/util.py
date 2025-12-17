@@ -5,7 +5,7 @@ from pathlib import Path
 
 import blake3
 
-from event.datatypes import FileChecksums, FileMetadata
+from event.datatypes import FileChecksums, FileMetadata, FloppyDiskCaptureID
 
 FLOPPY_DISK_CAPTURE_FILENAME_UUID_NAMESPACE = uuid.UUID('019a9df8-6505-7032-923f-12a806f8bdbf')
 
@@ -37,12 +37,11 @@ def get_git_version() -> str:
         # If git is not available or not a git repo, return unknown
         return 'unknown'
 
-def floppy_disk_capture_filename_to_id(filename: str) -> uuid.UUID:
+def floppy_disk_capture_filename_to_id(filename: str) -> FloppyDiskCaptureID:
     """Convert a floppy disk capture filename to a UUID based on its name."""
     if filename.endswith('_parsed'):
         filename = filename.removesuffix('_parsed')
-    # Use UUID5 with the DNS namespace and the filename as the name
-    return uuid.uuid5(namespace=FLOPPY_DISK_CAPTURE_FILENAME_UUID_NAMESPACE, name=filename)
+    return FloppyDiskCaptureID(uuid.uuid5(namespace=FLOPPY_DISK_CAPTURE_FILENAME_UUID_NAMESPACE, name=filename))
 
 
 class PathWithExtension():
