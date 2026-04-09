@@ -56,20 +56,20 @@ class Pauline():
             line = line.strip()
             if line.startswith('set'):
                 var = line.split(' ')[1]
-                val = ' '.join(line.split(' ')[2:])
+                val = line.split(None, 2)[-1].strip().strip('"').strip()
 
                 if var == 'DRIVE_0_DESCRIPTION':
-                    self.drives[0] = val.strip('"')
+                    self.drives[0] = val
                 elif var == 'DRIVE_1_DESCRIPTION':
-                    self.drives[1] = val.strip('"')
+                    self.drives[1] = val
                 elif var == 'DRIVE_2_DESCRIPTION':
-                    self.drives[2] = val.strip('"')
+                    self.drives[2] = val
                 elif var == 'DRIVE_3_DESCRIPTION':
-                    self.drives[3] = val.strip('"')
+                    self.drives[3] = val
                 elif var == 'DRIVE_4_DESCRIPTION':
-                    self.drives[4] = val.strip('"')
+                    self.drives[4] = val
                 elif var == 'DRIVE_5_DESCRIPTION':
-                    self.drives[5] = val.strip('"')
+                    self.drives[5] = val
 
         print(f"Connected. Parsed drives from config: {self.drives}")
 

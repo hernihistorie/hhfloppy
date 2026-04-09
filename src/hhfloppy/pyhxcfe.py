@@ -18,12 +18,11 @@ import uuid
 import click
 from jinja2 import Environment, FileSystemLoader
 from tqdm import tqdm
-from hhfloppy.event.datatypes import FloppyDiskCaptureIDSource, PyHXCFERunID
 from util import get_directory_files_metadata, floppy_disk_capture_filename_to_id, get_git_version
 from python_imd.imd import Disk
 from event.events import Event, FloppyDiskCaptureDirectoryConverted, FloppyDiskCaptureSummarized, PyHXCFEERunFinished, PyHXCFEERunStarted
 from event.event_store import EventStore
-from event.datatypes import FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML
+from event.datatypes import FloppyInfoFromIMD, FloppyInfoFromName, FloppyInfoFromXML, FloppyDiskCaptureIDSource, PyHXCFERunID
 
 HXCFE_BINARY_PATH = Path('/home/sanqui/ha/HxCFloppyEmulator/build/hxcfe')
 WORKERS=16
@@ -49,6 +48,11 @@ def convert_disk_capture_directory(pyhxcfe_run_id: PyHXCFERunID, hxcfe_binary_pa
     parsed_dir = floppy_subdir.parent / (floppy_subdir.name + "_parsed_wip")
     if not os.path.exists(parsed_dir):
         mkdir(parsed_dir)
+
+    floppy_subdir_files = list(floppy_subdir.iterdir())
+    if len(floppy_subdir_files) == 0:
+        print(f"Warning: No files found in {floppy_subdir}")
+        return []
 
     first_file = next(floppy_subdir.iterdir())
     cmd: list[str] = [
