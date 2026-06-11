@@ -83,7 +83,7 @@ class FileConverted(Event, frozen=True):
     Event triggered when a file has been converted.
     """
     input_file_metadata: FileMetadata
-    output_file_metadata: FileMetadata
+    output_file_metadata: FileMetadata | None
     command_run_id: CommandRunID
     program: ProgramName
     has_warnings: bool

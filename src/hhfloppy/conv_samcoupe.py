@@ -24,7 +24,14 @@ class DSKPath(PathWithExtension):
     EXTENSION = '.dsk'
 
 def run_command(command: list[str]) -> CommandRan:
-    output = subprocess.run(command, check=True, text=True, capture_output=True)
+    output = subprocess.run(
+        command,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    if output.returncode:
+        print(f"Warning: Command failed with exit code {output.returncode}: {output.stderr}")
 
     event = CommandRan(
         command=command,
@@ -45,10 +52,15 @@ def samdisk_convert(input_filepath: HFEPath, output_filepath: MGTPath | DSKPath)
     command_ran_event = run_command(command)
 
     input_file_metadata = get_file_metadata(input_filepath.path)
-    output_file_metadata = get_file_metadata(output_filepath.path)
+    if output_filepath.path.exists():
+        output_file_metadata = get_file_metadata(output_filepath.path)
+    else:
+        output_file_metadata = None
 
     has_warnings = False
     has_errors = False
+    if command_ran_event.exit_code:
+        has_errors = True
     for line in command_ran_event.stdout.splitlines() + command_ran_event.stderr.splitlines():
         if 'Warning:' in line:
             has_warnings = True
