@@ -91,6 +91,8 @@ class Pauline():
         await self.send_ws(f"sound 2300 200")
     
     async def upload_to_nas(self):
+        if self.offline:
+            return
         print("Uploading onto NAS")
 
         # Get list of subdirectories in Disks_Captures
@@ -175,9 +177,10 @@ class Pauline():
         finally:
             self.pending_tasks.remove(asyncio.current_task())
 
-    async def run_batch(self, floppy_names: list[str], operator: str | None = None, num_tracks: int = 82, num_sides: int = 2) -> None:
+    async def run_batch(self, floppy_names: list[str], operator: str | None = None, num_tracks: int = 82, num_sides: int = 2, offline: bool = False) -> None:
         self.num_tracks = num_tracks
         self.num_sides = num_sides
+        self.offline = offline
         
         await self.connect()
 
@@ -272,7 +275,8 @@ class Pauline():
 @click.option('--operator', default=None, help='Operator name (defaults to current system user)')
 @click.option('--num-tracks', default=82, help='Number of tracks to dump (default: 82)')
 @click.option('--num-sides', default=2, help='Number of sides to dump (default: 2)')
-def main(address: str, floppy_names: tuple[str, ...], operator: str | None, num_tracks: int, num_sides: int):
+@click.option('--offline', default=False, is_flag=True, help='Disables uploading files to  NAS')
+def main(address: str, floppy_names: tuple[str, ...], operator: str | None, num_tracks: int, num_sides: int, offline: bool):
     """
     Dump floppy disks using Pauline.
     
@@ -281,7 +285,7 @@ def main(address: str, floppy_names: tuple[str, ...], operator: str | None, num_
     Names of the floppies to dump (one or more). Use '-' to skip a drive, '+' to increment last name, 'clean' for cleaning disk.
     """
     pauline = Pauline(address=address)
-    asyncio.run(pauline.run_batch(floppy_names=list(floppy_names), operator=operator, num_tracks=num_tracks, num_sides=num_sides))
+    asyncio.run(pauline.run_batch(floppy_names=list(floppy_names), operator=operator, num_tracks=num_tracks, num_sides=num_sides, offline=offline))
 
 if __name__ == "__main__":
     main()
